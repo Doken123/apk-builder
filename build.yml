@@ -8,6 +8,12 @@ on:
       build_type:
         description: 'Build type (debug/release)'
         required: true
+      app_name:
+        description: 'New App Name (Leave empty to keep original)'
+        required: false
+      icon_url:
+        description: 'URL to Icon (Leave empty to keep original)'
+        required: false
 
 jobs:
   build:
@@ -29,6 +35,30 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
+
+      - name: Modify App Name
+        if: ${{ github.event.inputs.app_name != '' }}
+        run: |
+          cd project
+          MANIFEST=$(find . -name "AndroidManifest.xml" | head -n 1)
+          if [ -n "$MANIFEST" ]; then
+            sed -i "s/android:label=\"[^\"]*\"/android:label=\"${{ github.event.inputs.app_name }}\"/g" $MANIFEST
+          fi
+
+      - name: Modify App Icon
+        if: ${{ github.event.inputs.icon_url != '' }}
+        run: |
+          cd project
+          curl -L -o icon.png "${{ github.event.inputs.icon_url }}"
+          sudo apt-get install -y imagemagick
+          for dir in $(find . -type d -name "mipmap-*"); do
+            if [[ "$dir" == *"hdpi"* ]] && [[ "$dir" != *"xhdpi"* ]] && [[ "$dir" != *"xxhdpi"* ]] && [[ "$dir" != *"xxxhdpi"* ]]; then size=72;
+            elif [[ "$dir" == *"xhdpi"* ]] && [[ "$dir" != *"xxhdpi"* ]] && [[ "$dir" != *"xxxhdpi"* ]]; then size=96;
+            elif [[ "$dir" == *"xxhdpi"* ]] && [[ "$dir" != *"xxxhdpi"* ]]; then size=144;
+            elif [[ "$dir" == *"xxxhdpi"* ]]; then size=192;
+            else size=48; fi
+            convert icon.png -resize ${size}x${size} "$dir/ic_launcher.png"
+          done
 
       - name: Build APK
         working-directory: ./project
